@@ -1,3 +1,4 @@
+from bisect import bisect_left, bisect_right
 from collections import defaultdict, deque, namedtuple
 import itertools
 import numpy
@@ -23,6 +24,12 @@ def createBody(path, **kwargs):
         with pb_robot.utils.LockRenderer():
             body_id = pb_robot.utils.load_model(path, **kwargs)
     return Body(body_id, path)
+
+def createDynamicBody(path_name, path, times, **kwargs):
+    with pb_robot.helper.HideOutput():
+        with pb_robot.utils.LockRenderer():
+            body_id = pb_robot.utils.load_model(path_name, **kwargs)
+    return DynamicBody(body_id, path, times, path_name=path_name)
 
 BodyInfo = namedtuple('BodyInfo', ['base_name', 'body_name'])
 DynamicsInfo = namedtuple('DynamicsInfo', ['mass', 'lateral_friction', 'local_inertia_diagonal',
@@ -436,3 +443,20 @@ class Body(object):
                 (link.get_link_parent()).get_link_name(), self.get_mass(link.linkID),
                 len(pb_robot.utils.get_collision_data(self, link.linkID)), -1)) # len(get_visual_data(body, link)))) #XXX move this function from utils
 
+class DynamicBody(Body):
+    def __init__(self, bodyID, path, times, path_name=None):
+        super(self.__class__, self).__init__(bodyID, path_name)
+        # everything is the same as Body except it also has a corresponding timed_path array
+        self.times = times
+        self.path = path
+
+        # self.sorted_path, self.sorted_times
+    
+    def get_position(self, t):
+        # get position at t
+        idx = max(0, bisect_left(self.times, t)-1)
+        if idx == len(self.times) - 1:
+            return self.path[idx]
+        
+        frac = float(t - self.times[idx])/(self.times[idx+1] - self.times[idx])
+        return self.path[idx] + frac*numpy.subtract(self.path[idx+1], self.path[idx])

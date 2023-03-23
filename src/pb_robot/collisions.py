@@ -33,7 +33,6 @@ def get_collision_fn(body, joints, obstacles, attachments, self_collisions, cust
         return False
     return collision_fn
 
-
 def get_self_link_pairs(body, joints, disabled_collisions=set(), only_moving=True):
     moving_links = get_moving_links(body, joints)
     #fixed_links = list(set(body.links) - set(moving_links))

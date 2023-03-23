@@ -7,6 +7,41 @@ Various utility functions for constrained tool manipulation
 
 import numpy
 import random
+import tsr
+
+from collections import deque
+
+INF = float('inf')
+
+
+
+
+def bisect(sequence):
+    sequence = list(sequence)
+    indices = set()
+    queue = deque([(0, len(sequence)-1)])
+    while queue:
+        lower, higher = queue.popleft()
+        if lower > higher:
+            continue
+        index = int((lower + higher) / 2.)
+        assert index not in indices
+        #if is_even(higher - lower):
+        yield sequence[index]
+        queue.extend([
+            (lower, index-1),
+            (index+1, higher),
+        ])
+
+def flatten(iterable_of_iterables):
+    return (item for iterables in iterable_of_iterables for item in iterables)
+
+def merge_dicts(*args):
+    result = {}
+    for d in args:
+        result.update(d)
+    return result
+    # return dict(reduce(operator.add, [d.items() for d in args]))
 
 def generatePath(path_array):
     '''Given an array of poses, create an OpenRAVE executable path
@@ -32,6 +67,19 @@ def generatePath(path_array):
     removeRows = []
     for i in range(len(path_array)-1):
         diff = sum(numpy.subtract(path_array[i], path_array[i+1]))
+        if abs(diff) < 1e-2:
+            removeRows += [i]
+    # Remove all rows after.
+    simplifiedPath = numpy.delete(path_array, removeRows, 0)
+    return simplifiedPath
+
+def generateTimedPath(path_array):
+    if path_array is None:
+        return None
+    
+    removeRows = []
+    for i in range(len(path_array)-1):
+        diff = sum(numpy.subtract(path_array[i][0], path_array[i+1][0]))
         if abs(diff) < 1e-2:
             removeRows += [i]
     # Remove all rows after.
@@ -72,7 +120,6 @@ def CreateTSRFromPose(manip, pose):
     @param manip Manipulator to use use (required for tsr)
     @param pose 4x4 transform to center TSR on
     @return tsr_chain chain with single pose TSR'''
-    import tsr
     goal_tsr = tsr.tsr.TSR(T0_w=pose)
     tsr_chain = tsr.tsr.TSRChain(sample_goal=True, TSR=goal_tsr)
     return tsr_chain

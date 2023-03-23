@@ -7,34 +7,41 @@ from .panda_controls import PandaControls
 
 from pb_robot.ikfast.ikfast import closest_inverse_kinematics, ikfast_inverse_kinematics
 
+
 class Panda(pb_robot.body.Body):
     '''Create all the functions for controlling the Panda Robot arm'''
+
     def __init__(self):
         '''Generate the body and establish the other classes'''
         self.urdf_file = 'models/franka_description/robots/panda_arm_hand.urdf'
-        #self.urdf_file = 'models/franka_description/robots/panda_arm.urdf'
+        # self.urdf_file = 'models/franka_description/robots/panda_arm.urdf'
 
-        with pb_robot.helper.HideOutput(): 
+        with pb_robot.helper.HideOutput():
             with pb_robot.utils.LockRenderer():
-                self.id = pb_robot.utils.load_model(self.urdf_file, fixed_base=True)
+                self.id = pb_robot.utils.load_model(
+                    self.urdf_file, fixed_base=True)
         pb_robot.body.Body.__init__(self, self.id)
 
         self.arm_joint_names = ['panda_joint{}'.format(i) for i in range(1, 8)]
-        self.arm_joints = [self.joint_from_name(n) for n in self.arm_joint_names]
+        self.arm_joints = [self.joint_from_name(
+            n) for n in self.arm_joint_names]
         self.ik_info = pb_robot.ikfast.utils.IKFastInfo(module_name='franka_panda.ikfast_panda_arm',
                                                         base_link='panda_link0',
                                                         ee_link='panda_link8',
                                                         free_joints=['panda_joint7'])
         self.torque_limits = [87, 87, 87, 87, 12, 12, 12]
-        self.startq = [0, -numpy.pi/4.0, 0, -0.75*numpy.pi, 0, numpy.pi/2.0, numpy.pi/4.0]
+        self.startq = [0, -numpy.pi/4.0, 0, -0.75 *
+                       numpy.pi, 0, numpy.pi/2.0, numpy.pi/4.0]
         self.hand = PandaHand(self.id)
-        self.arm = Manipulator(self.id, self.arm_joints, self.hand, 'panda_hand', self.ik_info, self.torque_limits, self.startq)
+        self.arm = Manipulator(self.id, self.arm_joints, self.hand,
+                               'panda_hand', self.ik_info, self.torque_limits, self.startq)
 
 
 class Manipulator(object):
     '''Class for Arm specific functions. Most of this is simply syntatic sugar for function
     calls to body functions. Within the documentation, N is the number of degrees of 
     freedom, which is 7 for Panda '''
+
     def __init__(self, bodyID, joints, hand, eeName, ik, torque_limits, startq=None):
         '''Establish all the robot specific variables and set up key
         data structures. Eventually it might be nice to read the specific variables
@@ -45,18 +52,20 @@ class Manipulator(object):
         self.joints = joints
         self.jointsID = [j.jointID for j in self.joints]
         self.eeFrame = self.__robot.link_from_name(eeName)
-        self.hand = hand 
+        self.hand = hand
         self.torque_limits = torque_limits
 
         # Eventually add a more fleshed out planning suite
         self.birrt = pb_robot.planners.BiRRTPlanner()
         self.snap = pb_robot.planners.SnapPlanner()
         self.cbirrt = pb_robot.planners.CBiRRTPlanner()
+        self.tprm = pb_robot.planners.TPRMPlanner()
 
         # Add force torque sensor at wrist
         self.ft_joint = self.__robot.joint_from_name('panda_hand_joint')
-        p.enableJointForceTorqueSensor(self.__robot.id, self.ft_joint.jointID, enableSensor=1)
-        #self.control = PandaControls(self)
+        p.enableJointForceTorqueSensor(
+            self.__robot.id, self.ft_joint.jointID, enableSensor=1)
+        # self.control = PandaControls(self)
 
         # We manually maintain the kinematic tree of grasped objects by
         # keeping track of a dictionary of the objects and their relations
@@ -67,9 +76,10 @@ class Manipulator(object):
         # Use IK fast for inverse kinematics
         self.ik_info = ik
 
-        # Set the robot to the default home position 
+        # Set the robot to the default home position
         if startq is not None:
-            self.startq = startq #[0, -numpy.pi/4.0, 0, -0.75*numpy.pi, 0, numpy.pi/2.0, numpy.pi/4.0]
+            # [0, -numpy.pi/4.0, 0, -0.75*numpy.pi, 0, numpy.pi/2.0, numpy.pi/4.0]
+            self.startq = startq
             self.SetJointValues(self.startq)
         self.collisionfn_cache = {}
 
@@ -87,7 +97,7 @@ class Manipulator(object):
         return self.GetJointValues()
 
     def set_configuration(self, q):
-        return self.SetJointValues(q) 
+        return self.SetJointValues(q)
 
     def get_transform(self):
         return self.__robot.get_transform()
@@ -99,26 +109,27 @@ class Manipulator(object):
         '''Return the robot configuration
         @return Nx1 array of joint values'''
         return numpy.array(self.__robot.get_joint_positions(self.joints))
-    
+
     def SetJointValues(self, q):
         '''Set the robot to configuration q. Update the location of any
         grasped objects.
         @param Nx1 desired configuration'''
         self.__robot.set_joint_positions(self.joints, q)
 
-        #If exists grabbed object, update its position too
+        # If exists grabbed object, update its position too
         if len(self.grabbedObjects.keys()) > 0:
             hand_worldF = self.GetEETransform()
             for i in self.grabbedObjects.keys():
                 obj = self.grabbedObjects[i]
                 grasp_objF = self.grabbedRelations[i]
-                obj_worldF = numpy.dot(hand_worldF, numpy.linalg.inv(grasp_objF))
+                obj_worldF = numpy.dot(
+                    hand_worldF, numpy.linalg.inv(grasp_objF))
                 obj.set_transform(obj_worldF)
 
     def GetJointLimits(self):
         '''Return the upper and lower joint position limits
         @return 2xN Tuple of lower and upper joint limits'''
-        return (self.__robot.get_min_limits(self.joints), 
+        return (self.__robot.get_min_limits(self.joints),
                 self.__robot.get_max_limits(self.joints))
 
     def Grab(self, obj, relation):
@@ -154,8 +165,8 @@ class Manipulator(object):
         pose = self.GetEETransform()
         self.SetJointValues(old_q)
         if tform is not None:
-            self.set_transform(tform)    
-        return pose 
+            self.set_transform(tform)
+        return pose
 
     def randomConfiguration(self):
         '''Generate a random configuration inside the position limits
@@ -177,11 +188,11 @@ class Manipulator(object):
         @param (optional) seed_q Configuration to bias the IK
         @return Nx1 configuration if successful, else 'None' '''
 
-        #These function operate in transforms but the IK function operates in poses
+        # These function operate in transforms but the IK function operates in poses
         pose = pb_robot.geometry.pose_from_tform(transform)
 
         if seed_q is None:
-            q = next(ikfast_inverse_kinematics(self.__robot, self.ik_info, 
+            q = next(ikfast_inverse_kinematics(self.__robot, self.ik_info,
                                                self.eeFrame, pose, max_time=0.05), None)
         else:
             # Seeded IK uses the current ik value, so set that and then reset change
@@ -193,7 +204,7 @@ class Manipulator(object):
             # If no ik, fall back on unseed version
             if q is None:
                 return self.ComputeIK(transform)
-        return q 
+        return q
 
     def get_collisionfn(self, obstacles=None, self_collisions=True):
         if obstacles is None:
@@ -202,10 +213,12 @@ class Manipulator(object):
                          and b.get_name() not in self.grabbedObjects.keys()]
         attachments = [g for g in self.grabbedObjects.values()]
         key = (frozenset(obstacles), frozenset(attachments), self_collisions)
-        if key not in self.collisionfn_cache:
-            self.collisionfn_cache[key] = pb_robot.collisions.get_collision_fn(
-                self.__robot, self.joints, obstacles, attachments, self_collisions)
-        return self.collisionfn_cache[key]
+        # if key not in self.collisionfn_cache:
+        #     self.collisionfn_cache[key] = pb_robot.collisions.get_collision_fn(
+        #         self.__robot, self.joints, obstacles, attachments, self_collisions)
+        # return self.collisionfn_cache[key]
+        return pb_robot.collisions.get_collision_fn(
+                 self.__robot, self.joints, obstacles, attachments, self_collisions)
 
     def IsCollisionFree(self, q, obstacles=None, self_collisions=True, handJoint=None):
         '''Check if a configuration is collision-free. Given any grasped objects
@@ -220,13 +233,14 @@ class Manipulator(object):
             (oldhand, _) = self.hand.GetJointPositions()
             self.hand.MoveTo(handJoint)
 
-        collisionfn = self.get_collisionfn(obstacles=obstacles, self_collisions=self_collisions)
+        collisionfn = self.get_collisionfn(
+            obstacles=obstacles, self_collisions=self_collisions)
 
         # Evaluate if in collision
         val = not collisionfn(q)
 
         # Robot will error if links get too close (i.e. predicts collision)
-        # so we want to insure that the is padding wrt collision-free-ness 
+        # so we want to insure that the is padding wrt collision-free-ness
         distances = self.HasClearance(q)
 
         # Restore configuration
@@ -243,20 +257,21 @@ class Manipulator(object):
                 # Dont want to check adjancent links or link 8 (fake hand joint)
                 if (abs(linkI-linkJ) < 2) or (linkI == 8) or (linkJ == 8):
                     break
-                pts = p.getClosestPoints(self.__robot.id, self.__robot.id, distance=0.01, linkIndexA=linkI, linkIndexB=linkJ)
+                pts = p.getClosestPoints(
+                    self.__robot.id, self.__robot.id, distance=0.01, linkIndexA=linkI, linkIndexB=linkJ)
                 if len(pts) > 0:
-                    return False 
+                    return False
         return True
 
-
-    def GetJacobian(self, q): 
+    def GetJacobian(self, q):
         '''Compute the jacobian at configuration q. The full set of joints
         (and hence jacobian calculation) includes the finger joints, so
         we remove those after
         @param q Configuration
         @return Nx6 array of J(q) '''
         allq = numpy.append(q, [0, 0]).tolist()
-        (translate, rotate) = pb_robot.planning.compute_jacobian(self.__robot, self.eeFrame, positions=allq)
+        (translate, rotate) = pb_robot.planning.compute_jacobian(
+            self.__robot, self.eeFrame, positions=allq)
         jacobian = numpy.hstack((numpy.array(translate), numpy.array(rotate)))
         return numpy.transpose(jacobian[0:7, :])
 
@@ -272,7 +287,8 @@ class Manipulator(object):
         q_plus = numpy.append(q, [0, 0]).tolist()
         dq_plus = numpy.append(dq, [0, 0]).tolist()
         ddq = [0.0]*9
-        coriolis = p.calculateInverseDynamics(self.__robot.id, q_plus, dq_plus, ddq)[0:7]
+        coriolis = p.calculateInverseDynamics(
+            self.__robot.id, q_plus, dq_plus, ddq)[0:7]
         return coriolis
 
     def InsideTorqueLimits(self, q, forces):
@@ -282,7 +298,8 @@ class Manipulator(object):
         @return check True if within torque limits '''
         jacobian = self.GetJacobian(q)
         torques = numpy.dot(numpy.transpose(jacobian), forces)
-        inside = all(numpy.less(abs(torques), self.torque_limits)) # Assuming symmetric
+        # Assuming symmetric
+        inside = all(numpy.less(abs(torques), self.torque_limits))
         return inside
 
     def GetJointTorques(self):
@@ -300,15 +317,42 @@ class Manipulator(object):
         @return 6D tuple of forces and torques'''
         return p.getJointState(self.__robot.id, self.ft_joint.jointID)[2]
 
-    def ExecutePositionPath(self, path, timestep=0.05):
+    def ExecutePositionPath(self, path, timestep=0.01, dynamic_obstacles=None):
         '''Simulate a configuration space path by incrementally setting the 
         joint values. This is instead of using control based methods
         #TODO add checks to insure path is valid. 
         @param path MxN list of configurations where M is number of positions
-        @param timestep Wait time between each configuration ''' 
+        @param timestep Wait time between each configuration '''
+        t = 0
         for i in range(len(path)):
+            prev_e = self.GetEETransform()
             self.SetJointValues(path[i])
+            e = self.GetEETransform()
+            if dynamic_obstacles:
+                e1 = numpy.array(prev_e)[:3, 3]
+                e2 = numpy.array(e)[:3, 3]
+                # print(e1)
+                timestep = numpy.linalg.norm(numpy.subtract(e1, e2))
+                t += timestep
+                # print("t", t)
+                # calculate distance between prev_q and current_q and multiply by 0.01 to get timestep
+                for obs in dynamic_obstacles:
+                    v = obs.get_velocity()[0]
+                    obs.set_point([a + b*timestep for a, b in zip(obs.get_point(), obs.get_velocity()[0])])
+                    obs.set_velocity(v)
+                print("CollisionFree?", self.IsCollisionFree(path[i]))
+            time.sleep(timestep*0.5)
+    
+    def ExecuteTimedPositionPath(self, timed_path, timestep=0.01, dynamic_obstacles=None):
+        prev_time = 0
+        for (q, t) in timed_path:
+            self.SetJointValues(q)
+            timestep = t - prev_time
+            if dynamic_obstacles:
+                for obs in dynamic_obstacles:
+                        obs.set_point(obs.get_position(t))
             time.sleep(timestep)
+            prev_time = t
 
     def getFaceByName(self, name):
         '''Search over the set of faces by name'''
@@ -317,17 +361,19 @@ class Manipulator(object):
                 return f
         return None
 
-                        
+
 class PandaHand(pb_robot.body.Body):
     '''Set position commands for the panda hand. Have not yet included
     gripping with force.'''
+
     def __init__(self, bodyID=None, left_finger_name='panda_finger_joint1', right_finger_name='panda_finger_joint2'):
         '''Pull left and right fingers from robot's joint list'''
         if bodyID is None:
             urdf_file = 'models/franka_description/robots/hand.urdf'
             with pb_robot.helper.HideOutput():
                 with pb_robot.utils.LockRenderer():
-                    bodyID = pb_robot.utils.load_model(urdf_file, fixed_base=True)
+                    bodyID = pb_robot.utils.load_model(
+                        urdf_file, fixed_base=True)
 
         self.bodyID = bodyID
         pb_robot.body.Body.__init__(self, bodyID)
@@ -335,7 +381,7 @@ class PandaHand(pb_robot.body.Body):
         self.right_finger = self.joint_from_name(right_finger_name)
         self.joints = [self.left_finger, self.right_finger]
         self.jointsID = [j.jointID for j in self.joints]
-        self.torque_limits = [50, 50] # Faked
+        self.torque_limits = [50, 50]  # Faked
 
     def Open(self):
         '''Open the fingers by setting their positions to the upper limit'''
@@ -353,7 +399,8 @@ class PandaHand(pb_robot.body.Body):
         distance/2. 
         @param distance Desired distance between fingers'''
         if not (0 <= distance <= 0.08):
-            raise IOError("Invalid distance request. The value must be between 0 and 0.08")
+            raise IOError(
+                "Invalid distance request. The value must be between 0 and 0.08")
         finger_distance = distance / 2.0
         self.left_finger.set_joint_position(finger_distance)
         self.right_finger.set_joint_position(finger_distance)

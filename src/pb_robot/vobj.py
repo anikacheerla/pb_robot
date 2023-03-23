@@ -102,11 +102,26 @@ class JointSpacePath(object):
         self.path = path
     def simulate(self):
         self.manip.ExecutePositionPath(self.path)
+    def simulate_with_dynamic_obstacles(self, dynamic_obstacles):
+        self.manip.ExecutePositionPath(self.path, dynamic_obstacles=dynamic_obstacles)
     def execute(self, realRobot=None):
         dictPath = [realRobot.convertToDict(q) for q in self.path]
         realRobot.execute_position_path(dictPath)
     def __repr__(self):
         return 'j_path{}'.format(id(self) % 1000)
+
+class JointSpaceTimedPath(object):
+    def __init__(self, manip, path):
+        self.manip = manip
+        self.path = path # array with tupes of (q, arrival_time)
+    def simulate(self):
+        self.manip.ExecuteTimedPositionPath(self.path)
+    def simulate_with_dynamic_obstacles(self, dynamic_obstacles):
+        self.manip.ExecuteTimedPositionPath(self.path, dynamic_obstacles=dynamic_obstacles)
+    def execute(self, realRobot=None):
+        raise NotImplementedError
+    def __repr__(self):
+        return 'jt_path{}'.format(id(self) % 1000)
 
 class MoveToTouch(object):
     def __init__(self, manip, start, end):
