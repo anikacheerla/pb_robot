@@ -193,7 +193,6 @@ class PRM(Roadmap):
         self.distance_fn = distance_fn
         self.extend_fn = extend_fn
         self.collision_fn = collision_fn
-        self.grow(samples)
 
     def grow(self, samples):
         raise NotImplementedError()
@@ -230,7 +229,8 @@ class PRM(Roadmap):
 ##################################################
 
 class TPRM(PRM):
-    def __init__(self, manip, distance_fn, extend_fn, collision_fn, static_obstacles, dynamic_obstacles, edge_collision_fn = None, samples=[], connect_distance=2.5):
+    def __init__(self, manip, distance_fn, extend_fn, collision_fn, static_obstacles, 
+                 dynamic_obstacles, edge_collision_fn = None, samples=[], connect_distance=2.5, json_file="graph.json"):
         self.manip = manip
         self.connect_distance = connect_distance # should be less than the dimensions of an obstacles
         self.static_obstacles = static_obstacles
@@ -239,7 +239,42 @@ class TPRM(PRM):
 
         super(self.__class__, self).__init__(
             distance_fn, extend_fn, collision_fn, samples=samples)
+        
+        # self.grow(samples)
+        if json_file:
+            self.load_graph(json_file)
+        else:
+            self.grow(samples)
 
+    
+    def load_graph(self, json_file):
+        import json
+        with open(json_file, 'r') as openfile:
+            # Reading from json file
+            json_object = json.load(openfile)
+            
+
+            for i, val in json_object.items():
+                v1 = TimeVertex(np.array(val[0]))
+                v2 = TimeVertex(np.array(val[1]))
+                path = val[2]
+                times = val[3]
+                edge = TimeEdge(v1, v2, path)
+                edge.times = times
+                self.edges.append(edge) 
+
+    def save_graph(self, json_file):
+        import json
+        graph = dict()
+
+        # Save each edge: q1, q2: path, times
+        # initialize vertices by looping through edges, intialize times
+
+        for i, e in enumerate(self.edges): 
+            graph[i] = (e.v1.q.tolist(), e.v2.q.tolist(), e._path, e.times)
+        with open(json_file, 'w') as outfile:
+            json.dump(graph, outfile)
+                
     def duration(self, v1, v2):
         # Calculate time taken to get from q1 to q2
         # Everything takes 1 sec per unti distance for now
@@ -299,7 +334,8 @@ class TPRM(PRM):
                 e.times.append((collision_start[i], max_time))
 
 
-    def __call__(self, q1, q2):
+    def __call__(self, q1, q2, start_time=0):
+        # TODO: start_time is global time at which previous path ended
         self.grow(samples=[q1, q2])
 
         if q1 not in self or q2 not in self:
@@ -308,10 +344,10 @@ class TPRM(PRM):
         heuristic = lambda v: self.distance_fn(v.q, goal.q)  # lambda v: 0
 
         queue = [(heuristic(start), start)]
-        nodes, processed = {start: SearchNode(0, None)}, set()
+        nodes, processed = {start: SearchNode(start_time, None)}, set()
 
         arrival_times = dict()
-        arrival_times[start] = 0
+        arrival_times[start] = start_time
 
         def retrace(v):
             if nodes[v].parent is None:
@@ -321,7 +357,7 @@ class TPRM(PRM):
         def retrace_with_times(v):
             # print(arrival_times[v])
             if nodes[v].parent is None:
-                assert arrival_times[v] == 0
+                assert arrival_times[v] == start_time
                 return [(v.q, arrival_times[v])]
             parent = nodes[v].parent
             return retrace_with_times(parent) + v.edges[parent].path(parent, arrival_times[parent], arrival_times[v])
@@ -333,7 +369,7 @@ class TPRM(PRM):
                 continue
             processed.add(cv)
             if cv == goal:
-                return retrace_with_times(cv)
+                return retrace_with_times(cv), t # return end_time as well
             for nv, edge in cv.edges.items():
                 duration = self.duration(cv, nv)
                 is_active, next_free = edge.is_edge_active(t+duration)
@@ -350,13 +386,13 @@ class TPRM(PRM):
                 else: # does it help to wait until that edge is active?
                     wait_time = next_free - (t + duration) # find next free interval of node
                     assert nv.is_active(next_free)[0]
-                    cost = nodes[cv].cost + self.distance_fn(cv.q, nv.q) # function of wait time gives wait penalty
+                    cost = nodes[cv].cost + self.distance_fn(cv.q, nv.q) #+ 0.01*wait_time # function of wait time gives wait penalty
                     if (nv not in nodes) or (cost < nodes[nv].cost):
                         nodes[nv] = SearchNode(cost, cv)
                         arrival_times[nv] = next_free
                         if cv != nv:
                             heappush(queue, (cost + heuristic(nv), nv))
-        return None
+        return None, None
     
     def connect(self, v1, v2, path=None):
         if v1 not in v2.edges:  # TODO - what about parallel edges?
@@ -384,8 +420,7 @@ class TPRM(PRM):
                             new_edges.append(edge)
         
         self.calculate_edge_time_availabilities(new_edges, self.dynamic_obstacles)
-        # for e in new_edges:
-        #     print(e.times)
+        # self.save_graph("place_two_blocks.json")
         return new_vertices
 
     def add(self, samples):

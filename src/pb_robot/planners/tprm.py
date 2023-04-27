@@ -46,8 +46,8 @@ class TPRMPlanner(object):
 
 
         # TODO: split up static and dynamic obstacles to pass into prm 
-        path = self.TPRMPlanner(manip, start, goal_config, GoalType.JOINT, **kw_args)
-        return util.generateTimedPath(path)
+        path, end_time = self.TPRMPlanner(manip, start, goal_config, GoalType.JOINT, **kw_args)
+        return util.generateTimedPath(path), end_time
 
     def PlanToEndEffectorPose(self, manip, start, goal_pose, **kw_args):
         '''Plan from one joint location (start) to an end effector pose (goal_pose) with
@@ -90,8 +90,8 @@ class TPRMPlanner(object):
         @return OpenRAVE joint trajectory or None if plan failed'''
 
         # static and dynamic obstacles in **kw_args
-        path = self.TPRMPlanner(manip, start, goal_tsr, GoalType.TSR_EE, constraints=constraints, **kw_args)
-        return util.generateTimedPath(path)
+        path, end_time = self.TPRMPlanner(manip, start, goal_tsr, GoalType.TSR_EE, constraints=constraints, **kw_args)
+        return util.generateTimedPath(path), end_time
 
     def distance_fn(self, q1, q2):
         tform_1 = self.manip.ComputeFK(q1)
@@ -102,7 +102,7 @@ class TPRMPlanner(object):
 
 
     def TPRMPlanner(self, manip, start, goalLocation, goal_type, roadmap = None, static_obstacles=None, dynamic_obstacles = None, 
-                        constraints=None, grasp=None, num_samples=20):
+                        constraints=None, grasp=None, num_samples=20, start_time=0):
         '''Given start and end goals, plan a path
         @param manip Arm to plan wit
         @param start start joint configuration
@@ -134,8 +134,6 @@ class TPRMPlanner(object):
 
         # If our goal is a joint configuration, that is our final goal.
         # However, if we have a TSR we sample a goal node
-
-
         if self.goal_type is not GoalType.JOINT:
             self.goal = self.addRootConfiguration()
             if not self.goal: # no configuration for grasp was found
@@ -150,7 +148,7 @@ class TPRMPlanner(object):
         manip.SetJointValues(original_pose) 
 
         # Return an trajectory
-        return roadmap(numpy.array(start), numpy.array(self.goal))
+        return roadmap(numpy.array(start), numpy.array(self.goal), start_time)
     
     def makeRoadmap(self, manip, static_obstacles=None, dynamic_obstacles=None, num_samples=100, constraints=None, connect_distance=0.5):
         self.manip = manip

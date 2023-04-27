@@ -36,7 +36,6 @@ class Panda(pb_robot.body.Body):
         self.arm = Manipulator(self.id, self.arm_joints, self.hand,
                                'panda_hand', self.ik_info, self.torque_limits, self.startq)
 
-
 class Manipulator(object):
     '''Class for Arm specific functions. Most of this is simply syntatic sugar for function
     calls to body functions. Within the documentation, N is the number of degrees of 
@@ -317,13 +316,12 @@ class Manipulator(object):
         @return 6D tuple of forces and torques'''
         return p.getJointState(self.__robot.id, self.ft_joint.jointID)[2]
 
-    def ExecutePositionPath(self, path, timestep=0.01, dynamic_obstacles=None):
+    def ExecutePositionPath(self, path, timestep=0.01, dynamic_obstacles=None, t=0):
         '''Simulate a configuration space path by incrementally setting the 
         joint values. This is instead of using control based methods
         #TODO add checks to insure path is valid. 
         @param path MxN list of configurations where M is number of positions
         @param timestep Wait time between each configuration '''
-        t = 0
         for i in range(len(path)):
             prev_e = self.GetEETransform()
             self.SetJointValues(path[i])
