@@ -240,6 +240,7 @@ class TPRM(PRM):
         super(self.__class__, self).__init__(
             distance_fn, extend_fn, collision_fn, samples=samples)
         
+        self.json_file = json_file
         # self.grow(samples)
         if json_file:
             self.load_graph(json_file)
@@ -386,12 +387,15 @@ class TPRM(PRM):
                 else: # does it help to wait until that edge is active?
                     wait_time = next_free - (t + duration) # find next free interval of node
                     assert nv.is_active(next_free)[0]
-                    cost = nodes[cv].cost + self.distance_fn(cv.q, nv.q) #+ 0.01*wait_time # function of wait time gives wait penalty
+                    cost = nodes[cv].cost + self.distance_fn(cv.q, nv.q) + 0.01*wait_time # function of wait time gives wait penalty
                     if (nv not in nodes) or (cost < nodes[nv].cost):
                         nodes[nv] = SearchNode(cost, cv)
                         arrival_times[nv] = next_free
                         if cv != nv:
                             heappush(queue, (cost + heuristic(nv), nv))
+        print("Plan motion FAILED")
+        # import IPython
+        # IPython.embed()
         return None, None
     
     def connect(self, v1, v2, path=None):
@@ -420,7 +424,8 @@ class TPRM(PRM):
                             new_edges.append(edge)
         
         self.calculate_edge_time_availabilities(new_edges, self.dynamic_obstacles)
-        # self.save_graph("place_two_blocks.json")
+        if not self.json_file:
+            self.save_graph("graph_hard.json")
         return new_vertices
 
     def add(self, samples):

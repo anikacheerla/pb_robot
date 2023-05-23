@@ -116,8 +116,8 @@ class JointSpaceTimedPath(object):
         self.path = path # array with tupes of (q, arrival_time)
     def simulate(self):
         self.manip.ExecuteTimedPositionPath(self.path)
-    def simulate_with_dynamic_obstacles(self, dynamic_obstacles):
-        self.manip.ExecuteTimedPositionPath(self.path, dynamic_obstacles=dynamic_obstacles)
+    def simulate_with_dynamic_obstacles(self, dynamic_obstacles, last=False):
+        self.manip.ExecuteTimedPositionPath(self.path, dynamic_obstacles=dynamic_obstacles, last=last)
     def execute(self, realRobot=None):
         raise NotImplementedError
     def __repr__(self):

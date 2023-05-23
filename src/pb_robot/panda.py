@@ -340,8 +340,8 @@ class Manipulator(object):
                     obs.set_velocity(v)
                 print("CollisionFree?", self.IsCollisionFree(path[i]))
             time.sleep(timestep*0.5)
-    
-    def ExecuteTimedPositionPath(self, timed_path, timestep=0.01, dynamic_obstacles=None):
+
+    def ExecuteTimedPositionPath(self, timed_path, timestep=0.01, dynamic_obstacles=None, last=False):
         prev_time = 0
         for (q, t) in timed_path:
             self.SetJointValues(q)
@@ -350,6 +350,14 @@ class Manipulator(object):
                 for obs in dynamic_obstacles:
                         obs.set_point(obs.get_position(t))
             time.sleep(timestep)
+            prev_time = t
+
+        while last and prev_time <= 3.0:
+            t += 0.2
+            if dynamic_obstacles:
+                for obs in dynamic_obstacles:
+                    obs.set_point(obs.get_position(t))
+            time.sleep(0.2)
             prev_time = t
 
     def getFaceByName(self, name):

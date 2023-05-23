@@ -34,7 +34,7 @@ class TPRMPlanner(object):
         self.handles = []
     
     def collision_fn(self, q):
-        return not self.manip.IsCollisionFree(q, obstacles=self.static_obstacles, self_collisions=True)
+        return not self.manip.IsCollisionFree(q, obstacles=self.fixed, self_collisions=True)
 
     def PlanToConfiguration(self, manip, start, goal_config, **kw_args):
         '''Plan from one joint location (start) to another (goal_config) with
@@ -101,7 +101,7 @@ class TPRMPlanner(object):
         return np.linalg.norm(np.subtract(e1, e2))
 
 
-    def TPRMPlanner(self, manip, start, goalLocation, goal_type, roadmap = None, static_obstacles=None, dynamic_obstacles = None, 
+    def TPRMPlanner(self, manip, start, goalLocation, goal_type, roadmap = None, static_obstacles=None, dynamic_obstacles = None, fixed=None,
                         constraints=None, grasp=None, num_samples=20, start_time=0):
         '''Given start and end goals, plan a path
         @param manip Arm to plan wit
@@ -124,6 +124,7 @@ class TPRMPlanner(object):
         self.grasp = grasp 
         self.static_obstacles = static_obstacles
         self.dynamic_obstacles = dynamic_obstacles
+        self.fixed = fixed
         self.edge_collision_fn =self.checkEdgeCollision
         # self.distance_fn = lambda q1, q2: numpy.linalg.norm(numpy.subtract(q2, q1))        
         
@@ -150,11 +151,12 @@ class TPRMPlanner(object):
         # Return an trajectory
         return roadmap(numpy.array(start), numpy.array(self.goal), start_time)
     
-    def makeRoadmap(self, manip, static_obstacles=None, dynamic_obstacles=None, num_samples=100, constraints=None, connect_distance=0.5):
+    def makeRoadmap(self, manip, static_obstacles=None, dynamic_obstacles=None, fixed=None, num_samples=100, constraints=None, connect_distance=0.5):
         self.manip = manip
         self.constraints = constraints
         self.static_obstacles = static_obstacles
         self.dynamic_obstacles = dynamic_obstacles
+        self.fixed = fixed
         self.edge_collision_fn =self.checkEdgeCollision
 
         samples = [self.randomConfig() for _ in range(num_samples)]
@@ -241,7 +243,7 @@ class TPRMPlanner(object):
         joint_values = numpy.zeros(len(lower))
         for i in range(len(lower)):
             joint_values[i] = random.uniform(lower[i], upper[i])
-        if self.manip.IsCollisionFree(joint_values, obstacles=self.static_obstacles):
+        if self.manip.IsCollisionFree(joint_values, obstacles=self.fixed + self.static_obstacles):
             return joint_values
         return self.randomConfig()
     
